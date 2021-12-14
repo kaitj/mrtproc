@@ -1,0 +1,24 @@
+# File extensions
+*.nii.gz 
+*.mif 
+*.tck
+
+# Folders
+# Preop
+preop/sub-*/
+preop/derivatives/prepdwi_v0.0.13/bedpost/
+preop/derivatives/prepdwi_v0.0.13/prepdwi/
+preop/derivatives/prepdwi_v0.0.13/work
+preop/derivatives/prepdwi_v0.0.13/code/jobs/
+preop/derivatives/mrtpipelines_0.1.6/mrtpipelines/
+preop/derivatives/mrtpipelines_0.1.6/code/jobs/
+
+# Postop
+postop/sub-*/
+postop/derivatives/prepdwi_v0.0.13/bedpost/
+postop/derivatives/prepdwi_v0.0.13/prepdwi/
+postop/derivatives/prepdwi_v0.0.13/work
+postop/derivatives/prepdwi_v0.0.13/code/jobs/
+postop/derivatives/mrtpipelines_0.1.6/mrtpipelines/
+postop/derivatives/mrtpipelines_0.1.6/code/jobs/
+

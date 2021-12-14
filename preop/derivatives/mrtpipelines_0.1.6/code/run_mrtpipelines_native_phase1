@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Variables
+subj=$1 
+nseeds=$2
+njobs=$3
+
+out_dir=/scratch/$USER/pre_post_tle_connectivity/preop
+prepdwi_dir=$out_dir/derivatives/prepdwi_v0.0.13/prepdwi
+
+# Singularity
+SINGULARITY_IMG=$HOME/opt/singularity/mrtpipelines_0.1.6.sif
+SINGULARITY_FMRI=$HOME/singularity/bids-apps/poldracklab_fmriprep_20.2.0.sif # For python with necessary libraries
+export SINGULARITYENV_OMP_NUM_THREADS=$njobs
+export SINGULARITYENV_MKL_NUM_THREADS=$njobs
+
+# Code 
+## Intensity normalize dwi to b0
+mkdir -p $SLURM_TMPDIR/$subj/dwi 
+singularity exec $SINGULARITY_IMG dwinormalise -nthreads $njobs -fslgrad $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bvec $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bval $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.nii.gz $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_brainmask.nii.gz $SLURM_TMPDIR/$subj/dwi/${subj}_dwi_space-T1w_preproc_normalized.nii.gz
+
+## Create seed mask with FA map (threshold = 0.15)
+mkdir -p $SLURM_TMPDIR/$subj/dti
+singularity exec $SINGULARITY_IMG mrthreshold -nthreads $njobs $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_proc-FSL_FA.nii.gz -abs 0.15 -mask $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_brainmask.nii.gz $SLURM_TMPDIR/$subj/dti/${subj}_space-T1w_desc-seed_mask.nii.gz 
+
+## Estimate RF 
+mkdir -p $SLURM_TMPDIR/$subj/response
+
+singularity exec $SINGULARITY_IMG dwi2response dhollander -fslgrad $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bvec $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bval -shells 0,1000 -lmax 0,4 $SLURM_TMPDIR/$subj/dwi/${subj}_dwi_space-T1w_preproc_normalized.nii.gz $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-rffull_wm.txt $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-rffull_gm.txt $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-rffull_csf.txt
+
+tail -n 1 $SLURM_TMPDIR/${subj}/response/${subj}_space-T1w_desc-rffull_wm.txt > $SLURM_TMPDIR/${subj}/response/${subj}_space-T1w_desc-rf_wm.txt
+
+## Compute FOD
+singularity exec $SINGULARITY_IMG dwi2fod csd -fslgrad $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bvec $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bval -lmax 4 $SLURM_TMPDIR/$subj/dwi/${subj}_dwi_space-T1w_preproc_normalized.nii.gz $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-rf_wm.txt $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-fod_wm.mif 
+
+## Perform tractography (100 seeds per voxel)
+mkdir -p $SLURM_TMPDIR/$subj/tractography 
+
+singularity exec $SINGULARITY_IMG tckgen -nthreads $njobs -algorithm iFOD2 -seed_random_per_voxel $SLURM_TMPDIR/$subj/dti/${subj}_space-T1w_desc-seed_mask.nii.gz $nseeds -fslgrad $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bvec $prepdwi_dir/$subj/dwi/${subj}_dwi_space-T1w_preproc.bval $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-fod_wm.mif $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-iFOD2_tractography.tck
+
+singularity exec $SINGULARITY_IMG tcksift2 -nthreads $njobs $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-iFOD2_tractography.tck $SLURM_TMPDIR/$subj/response/${subj}_space-T1w_desc-fod_wm.mif $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-sift2_tckweights.txt
+
+## Create structural connectivity matrix (4mm search radius)
+## Weighted by inverse streamline length to deal with bias of longer streamlines
+singularity exec $SINGULARITY_IMG tck2connectome -nthreads $njobs -tck_weights_in $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-sift2_tckweights.txt -zero_diagonal -out_assignments $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-schaefer_assignments.txt $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-iFOD2_tractography.tck /project/6050199/cfmm-bids/Peters/pre_post_tle_connectivity/denoise_pre_post_tle/results/preop/$subj/${subj}_space-T1w_desc-schaefer_site-ge_from-MNI152NLin2009cAsym_dseg.nii.gz $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-schaefer_conn.csv
+
+# Generate conn matrix
+singularity exec $SINGULARITY_FMRI python $out_dir/derivatives/mrtpipelines_0.1.6/code/scripts/gen_conn.py $subj $SLURM_TMPDIR/$subj/tractography/${subj}_space-T1w_desc-schaefer_conn.csv preop $USER
+
+## Sync to output (update)
+rm $SLURM_TMPDIR/$subj/dwi/${subj}_dwi_space-T1w_preproc_normalized.nii.gz 
+
+mkdir -p $out_dir/derivatives/mrtpipelines_0.1.6/mrtpipelines
+pushd .
+cd $SLURM_TMPDIR
+rsync -rv $subj $out_dir/derivatives/mrtpipelines_0.1.6/mrtpipelines
+popd 

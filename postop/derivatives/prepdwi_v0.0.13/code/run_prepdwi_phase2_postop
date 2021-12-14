@@ -1,0 +1,43 @@
+#!/bin/bash 
+
+# User input 
+subj=$1 
+njobs=$2
+
+subj_suffix=${subj:4}
+
+# Singularity container
+SINGULARITY_PREPDWI=$HOME/singularity/bids-apps/khanlab_prepdwi_latest.sif
+SINGULARITYENV_OMP_NUM_THREADS=$njobs
+SINGULARITYENV_MKL_NUM_THREADS=$njobs
+
+# Run prepdwi
+# Distortion correction will be performed separately - current reg_aladin call seems to perform rig+affine even with rigOnly flag set 
+singularity exec $SINGULARITY_PREPDWI $HOME/opt/git/prepdwi/prepdwi /scratch/$USER/pre_post_tle_connectivity/postop /scratch/$USER/pre_post_tle_connectivity/postop/derivatives/prepdwi_v0.0.13/ participant --participant_label $subj --no-gradcorr --no-bedpost --no-dke  -w $SLURM_TMPDIR --in_brainmask_dir /scratch/$USER/pre_post_tle_connectivity/postop/derivatives/resected_masks
+
+# Remove output 
+# rm /scratch/$USER/pre_post_tle_connectivity/postop/derivatives/prepdwi_v0.0.13/prepdwi/$subj/dwi/*
+
+# If phase1 (GE), need to rerun eddy because EffectiveEchoSpacing is a string
+# pushd .
+# cd /scratch/$USER/pre_post_tle_connectivity/postop/derivatives/prepdwi_v0.0.13/work
+
+# if [[ ${subj_suffix:0:1} == "P" ]]; then
+#     rm -r /scratch/$USER/pre_post_tle_connectivity/postop/derivatives/prepdwi_v0.0.13/work/$subj/dwi/uncorrected_denoise_unring_eddy
+
+#     singularity exec $SINGULARITY_PREPDWI $HOME/opt/git/prepdwi/bin/processEddyNoTopUp uncorrected_denoise_unring $subj
+# fi 
+
+# # Distortion correction + regT1
+# singularity exec $SINGULARITY_PREPDWI $HOME/opt/git/prepdwi/bin/processDistortCorrect uncorrected_denoise_unring_eddy $subj
+
+# cp /scratch/$USER/pre_post_tle_connectivity/postop/$subj/anat/${subj}_desc-preproc_T1w.nii.gz $subj/t1/t1.nii.gz
+# cp /scratch/$USER/pre_post_tle_connectivity/postop/$subj/anat/${subj}_desc-brain_mask.nii.gz $subj/t1/t1.mask.nii.gz
+
+# singularity exec $SINGULARITY_PREPDWI $HOME/opt/git/prepdwi/bin/processRegT1 uncorrected_denoise_unring_eddy_dc $subj
+
+# ln -srfvn $subj/dwi/uncorrected_denoise_unring_eddy_dc_regT1 $subj/dwi/processed
+
+# singularity exec $SINGULARITY_PREPDWI processCleanupBIDS uncorrected_denoise_unring_eddy_dc_regT1 /scratch/$USER/pre_post_tle_connectivity/postop/derivatives/prepdwi_v0.0.13/ $subj 2.5
+
+# popd 
