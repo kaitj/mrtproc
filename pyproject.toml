@@ -24,7 +24,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poe.tasks]
 setup = 'pre-commit install'
-quality = { shell = 'isort mrtproc/*.py && black mrtproc' }
+quality = { shell = 'isort mrtproc/*.py && black mrtproc && flake8 mrtproc && pylint mrtproc' }
 
 [tool.isort]
 profile = 'black'
