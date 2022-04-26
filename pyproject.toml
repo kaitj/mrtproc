@@ -29,3 +29,10 @@ quality = { shell = 'isort mrtproc/*.py && black mrtproc' }
 [tool.isort]
 profile = 'black'
 multi_line_output = 3
+
+[tool.pylint.messages_control]
+disable = """
+    missing-function-docstring,
+    missing-module-docstring,
+    fixme
+"""
