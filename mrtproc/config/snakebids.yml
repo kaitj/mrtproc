@@ -87,6 +87,7 @@ parse_args:
           algorithms which include the b=0 volumes in their computations may
           otherwise return an undesired reuslt.'
     nargs: "+"
+    required: True
 
   --lmax:
     help: '(Mrtrix3) the maximum spherical harmonic order for the output FOD(s).
@@ -96,6 +97,7 @@ parse_args:
           commands will use the lmax of the corresponding response function (i.e
           based on its number of coefficients), up to a maximum of 8.'
     nargs: "+"
+    required: True
 
   --step_size:
     help: '(Mrtrix3) set the step size of the algorithm in mm (default is set to
