@@ -2,10 +2,9 @@
 
 import snakebids
 from snakebids import bids
-
+from os.path import join
 
 configfile: "config/snakebids.yml"
-
 
 # writes inputs_config.yml and updates config dict
 config.update(
@@ -24,93 +23,83 @@ wildcard_constraints:
     **snakebids.get_wildcard_constraints(config["pybids_inputs"]),
 
 
+root = os.path.join(config["root"], "mrtrix")
+
 # ---- end snakebids boilerplate ------------------------------------------------
 
 # Mrtrix3 citation (additional citations are included per rule as necessary):
 # Tournier, J.-D.; Smith, R. E.; Raffelt, D.; Tabbara, R.; Dhollander, T.; Pietsch, M.; Christiaens, D.; Jeurissen, B.; Yeh, C.-H. & Connelly, A. MRtrix3: A fast, flexible and open software framework for medical image processing and visualisation. NeuroImage, 2019, 202, 116137
 
+rule all:
+    input:
+        expand(
+            bids(
+            root=root,
+            datatype='tractography',
+            space='T1w',
+            suffix='conn.csv',
+            **config['subj_wildcards'],
+        ),
+        subject=config['subjects'])
+
 #----------- MRTRIX PREPROC BEGIN ------------#
 rule nii2mif:
     input:
-        dwi=bids(
-            root=join(config["bids_dir"], 'derivatives/prepdwi'),
-            datatype='dwi',
-            suffix='dwi.nii.gz',
-            space='T1w',
-            **config['subj_wildcards'],
-        )
-        bval=bids(
-            root=join(config["bids_dir"], 'derivatives/prepdwi'),
-            datatype='dwi',
-            suffix='dwi.bvec',
-            space='T1w',
-            **config['subj_wildcards'],
-        )
-        bval=bids(
-            root=join(config["bids_dir"], 'derivatives/prepdwi'),
-            datatype='dwi',
-            suffix='dwi.bval',
-            space='T1w',
-            **config['subj_wildcards'],
-        )
-        mask=bids(
-            root=join(config["bids_dir"], 'derivatives/prepdwi'),
-            datatype='dwi',
-            suffix='dwi_brainmask.nii.gz',
-            space='T1w',
-            **config['subj_wildcards'],
-        )
-    params:
-        nthreads=workflow.cores
+        dwi=config["input_path"]["dwi"],
+        bval=lambda wildcards: re.sub(".nii.gz", '.bval', config["input_path"]["dwi"]),
+        bvec=lambda wildcards: re.sub(".nii.gz", '.bvec', config["input_path"]["dwi"]),
+        mask=config['input_path']['mask']
+    threads: 4
     output:
         dwi=bids(
-            root=join(config["out_dir"], 'mrtrix')
+            root=root,
             datatype='dwi',
-            suffix='dwi.mif'
+            suffix='dwi.mif',
             space='T1w',
             **config['subj_wildcards'],
-        )
+        ),
         mask=bids(
-            root=join(config["out_dir"], 'mrtrix')
+            root=root,
             datatype='dwi',
-            suffix='dwi_brainmask.mif'
+            suffix='mask.mif',
             space='T1w',
             **config['subj_wildcards'],
         )
     container:
         config['singularity']['mrtrix']
     shell:
-        'mrconvert {input.dwi} {output.dwi} -fslgrad {input.bvec} {input.bval} -nthreads {params.nthreads}'
-        'mrconvert {input.mask} {output.mask} -nthreads {params.nthreads}'
+        'mrconvert {input.dwi} {output.dwi} -fslgrad {input.bvec} {input.bval} -nthreads {threads} && '
+        'mrconvert {input.mask} {output.mask} -nthreads {threads}'
 
 rule dwi2response:
     # Dhollander, T.; Mito, R.; Raffelt, D. & Connelly, A. Improved white matter response function estimation for 3-tissue constrained spherical deconvolution. Proc Intl Soc Mag Reson Med, 2019, 555
     input:
         dwi=rules.nii2mif.output.dwi,
         mask=rules.nii2mif.output.mask,
+        bval=lambda wildcards: re.sub(".nii.gz", '.bval', config["input_path"]["dwi"]),
+        bvec=lambda wildcards: re.sub(".nii.gz", '.bvec', config["input_path"]["dwi"]),
     params:
         shell=config.get('shells', ''),
         lmax=config.get('lmax', ''),
-        threads=workflow.cores,
     output:
         wm_rf=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='wm',
             suffix='response.txt',
             **config['subj_wildcards'],
-        )
+        ),
         gm_rf=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='gm',
             suffix='response.txt',
             **config['subj_wildcards'],
-        )
+        ),
         csf_rf=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='csf',
@@ -121,9 +110,9 @@ rule dwi2response:
         config['singularity']['mrtrix']
     shell:
         'if [ {params.shell} == "" ] && [ {params.lmax} == "" ]; then'
-        '  dwi2response dhollander {input.dwi} {output.wm_rf} {output.gm_rf} {output.csf_rf} -fslgrad {input.bvec} {input.bval} -nthreads {params.nthreads} -mask {input.mask} '
+        '  dwi2response dhollander {input.dwi} {output.wm_rf} {output.gm_rf} {output.csf_rf} -fslgrad {input.bvec} {input.bval} -nthreads {threads} -mask {input.mask} '
         'else '
-        '  dwi2response dhollander {input.dwi} {output.wm_rf} {output.gm_rf} {output.csf_rf} -fslgrad {input.bvec} {input.bval} -nthreads {params.nthreads} -shell {params.shell} -lmax {params.lmax} -mask {input.mask}'
+        '  dwi2response dhollander {input.dwi} {output.wm_rf} {output.gm_rf} {output.csf_rf} -fslgrad {input.bvec} {input.bval} -nthreads {threads} -shell {params.shell} -lmax {params.lmax} -mask {input.mask}'
         'fi'
         ''
 
@@ -142,33 +131,36 @@ rule dwi2fod:
         nthreads=workflow.cores,
     output:
         wm_fod=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='wm',
-            suffix='fod.mif'
+            suffix='fod.mif',
+            **config['subj_wildcards'],
         ),
         gm_fod=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='gm',
-            suffix='fod.mif'
+            suffix='fod.mif',
+            **config['subj_wildcards'],
         ),
         csf_fod=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='csf',
-            suffix='fod.mif'
+            suffix='fod.mif',
+            **config['subj_wildcards'],
         ),
     container:
         config['singularity']['mrtrix']
     shell:
         'if [ {params.shell} == "" ] && [ {params.lmax} == "" ]; then'
-        '  dwi2fod -nthreads {params.threads} -mask {input.mask} msmt_csd {input.dwi} {input.wm_rf} {output.wm_fod} {input.gm_rf} {output.gm_fod} {input.csf_rf} {output.csf_fod} '
+        '  dwi2fod -nthreads {threads} -mask {input.mask} msmt_csd {input.dwi} {input.wm_rf} {output.wm_fod} {input.gm_rf} {output.gm_fod} {input.csf_rf} {output.csf_fod} '
         'else '
-        '  dwi2fod -nthreads {params.threads} -mask {input.mask} -shell {params.shell} -lmax {params.lmax} msmt_csd {input.dwi} {input.wm_rf} {output.wm_fod} {input.gm_rf} {output.gm_fod} {input.csf_rf} {output.csf_fod} '
+        '  dwi2fod -nthreads {threads} -mask {input.mask} -shell {params.shell} -lmax {params.lmax} msmt_csd {input.dwi} {input.wm_rf} {output.wm_fod} {input.gm_rf} {output.gm_fod} {input.csf_rf} {output.csf_fod} '
         'fi'
 
 rule mtnormalise:
@@ -182,31 +174,34 @@ rule mtnormalise:
     params:
         nthreads=workflow.cores,
     output:
-        wm_fod_norm=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+        wm_fod=bids(
+            root=root,
             datatype='response',
             space='T1w',
             desc='normalized',
-            suffix='wm_fod.mif'
+            suffix='wm_fod.mif',
+            **config['subj_wildcards'],
         ),
         gm_fod=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='normalized',
-            suffix='gm_fod.mif'
+            suffix='gm_fod.mif',
+            **config['subj_wildcards'],
         ),
         csf_fod=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='response',
             space='T1w',
             desc='normalized',
-            suffix='csf_fod.mif'
+            suffix='csf_fod.mif',
+            **config['subj_wildcards'],
         ),
     container:
         config['singularity']['mrtrix']
     shell:
-        'mtnormalise -nthreads {params.nthreads}  -mask {input.mask} {input.wm_fod} {output.wm_fod_norm} {input.gm_fod} {output.gm_fod_norm} {input.csf_fod} {output.csf_fod_norm}'
+        'mtnormalise -nthreads {threads}  -mask {input.mask} {input.wm_fod} {output.wm_fod} {input.gm_fod} {output.gm_fod} {input.csf_fod} {output.csf_fod}'
 
 #-------------- MRTRIX PREPROC END ----------------#
 
@@ -214,52 +209,55 @@ rule mtnormalise:
 rule tckgen:
     # Tournier, J.-D.; Calamante, F. & Connelly, A. Improved probabilistic streamlines tractography by 2nd order integration over fibre orientation distributions. Proceedings of the International Society for Magnetic Resonance in Medicine, 2010, 1670
     input:
-        wm_fod=rules.mtnormalise.output.wm_fod_norm,
+        wm_fod=rules.mtnormalise.output.wm_fod,
         dwi=rules.nii2mif.output.dwi,
-        mask=rules.nii2mif.output.brainmask,
+        mask=rules.nii2mif.output.mask,
     params:
-        streamlines=config['sl_count']
+        streamlines=config['sl_count'],
         nthreads=workflow.cores,
     output:
         tck=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='tractography',
             space='T1w',
             desc='iFOD2',
-            suffix='tractography.tck'
+            suffix='tractography.tck',
+            **config['subj_wildcards'],
         )
     container:
         config['singularity']['mrtrix']
     shell:
-        'tckgen -nthreads {params.nthreads} -algorithm iFOD2 -mask {input.mask} -select {params.streamlines} {input.wm_fod} {output.tck}'
+        'tckgen -nthreads {threads} -algorithm iFOD2 -mask {input.mask} -select {params.streamlines} {input.wm_fod} {output.tck}'
 
 
 rule tcksift2:
     # Smith, R. E.; Tournier, J.-D.; Calamante, F. & Connelly, A. SIFT2: Enabling dense quantitative assessment of brain white matter connectivity using streamlines tractography. NeuroImage, 2015, 119, 338-351
     input:
-        wm_fod=rules.mtnormalise.output.wm_fod_norm,
+        wm_fod=rules.mtnormalise.output.wm_fod,
         tck=rules.tckgen.output.tck,
     params:
         nthreads=workflow.cores,
     output:
         tckweights=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='tractography',
             space='T1w',
             desc='sift2',
-            suffix='tckweights.txt'
-        )
+            suffix='tckweights.txt',
+            **config['subj_wildcards'],
+        ),
         mu=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='tractography',
             space='T1w',
             desc='sift2',
-            suffix='mu.txt'
+            suffix='mu.txt',
+            **config['subj_wildcards'],
         )
     container:
         config['singularity']['mrtrix']
     shell:
-        'tckgen -nthreads {params.nthreads} -out_mu {output.mu} {input.tck} {input.wm_fod} {output.tckweights}'
+        'tckgen -nthreads {threads} -out_mu {output.mu} {input.tck} {input.wm_fod} {output.tckweights}'
 
 
 rule tck2connectome:
@@ -272,20 +270,22 @@ rule tck2connectome:
         nthreads=workflow.cores,
     output:
         sl_assignment=bids(
-                root=join(config['out_dir'], 'mrtrix'),
+                root=root,
                 datatype='tractography',
                 space='T1w',
-                suffix='slAssignment.txt'
+                suffix='slAssignment.txt',
+            **config['subj_wildcards'],
         ),
         conn=bids(
-            root=join(config['out_dir'], 'mrtrix'),
+            root=root,
             datatype='tractography',
             space='T1w',
-            suffix='conn.csv'
+            suffix='conn.csv',
+            **config['subj_wildcards'],
         )
     container:
         config['singularity']['mrtrix']
     shell:
-        'tck2connectome -nthreads {params.nthreads} -tck_weights_in {input.tckweights} -out_assignments {output.sl_assignment} -zero_diagonal -symmetric {input.tck} {input.parcellation} {output.conn}
+        'tck2connectome -nthreads {threads} -tck_weights_in {input.tckweights} -out_assignments {output.sl_assignment} -zero_diagonal -symmetric {input.tck} {input.parcellation} {output.conn}'
 
 #----------- MRTRIX TRACTOGRAPHY END ------------#
