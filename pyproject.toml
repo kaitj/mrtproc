@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "mrtproc"
+version = "0.1.0"
+description = "Mrtrix3 preprocessing SnakeBIDS pipelines"
+authors = ["Jason Kai <tkai@uwo.ca>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8,<3.11"
+snakebids = "^0.5.0"
+
+[tool.poetry.group.dev.dependencies]
+snakefmt = "^0.6.0"
+black = ">=22.1, <23.0"
+isort = "^5.10.1"
+poethepoet = "^0.13.1"
+pre-commit = "^2.18.1"
+pylint = "^2.13.7"
+flake8 = "^4.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+setup = 'pre-commit install'
+quality = { shell = 'isort mrtproc/*.py && black mrtproc && flake8 mrtproc && pylint mrtproc' }
+
+[tool.isort]
+profile = 'black'
+multi_line_output = 3
+
+[tool.pylint.messages_control]
+disable = """
+    missing-function-docstring,
+    missing-module-docstring,
+    fixme
+"""

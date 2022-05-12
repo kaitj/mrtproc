@@ -1,0 +1,14 @@
+{
+    "Name": "Mrtrix3 processing pipeline - a Snakemake / SnakeBIDS app",
+    "BIDSVersion": "1.4.0",
+    "DatasetType": "derivative",
+    "GeneratedBy": [
+        {
+            "Name": "mrtproc",
+            "Version": "0.1.0",
+            "CodeURL": "https://github.com/kaitj/mrtproc",
+            "Author": "Jason Kai",
+            "AuthorEmail": "tkai@uwo.ca"
+        }
+    ]
+}
