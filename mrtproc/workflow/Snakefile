@@ -120,7 +120,6 @@ rule dwi2fod:
         csf_rf=rules.dwi2response.output.csf_rf,
     params:
         shells=','.join(config['shells']),
-        lmax=','.join(config['lmax'])
     output:
         wm_fod=bids(
             root=root,
@@ -147,7 +146,7 @@ rule dwi2fod:
     container:
         config['singularity']['mrtrix']
     shell:
-        'dwi2fod -nthreads {threads} -mask {input.mask} -shell {params.shells} -lmax {params.lmax} msmt_csd {input.dwi} {input.wm_rf} {output.wm_fod} {input.gm_rf} {output.gm_fod} {input.csf_rf} {output.csf_fod} '
+        'dwi2fod -nthreads {threads} -mask {input.mask} -shell {params.shells} msmt_csd {input.dwi} {input.wm_rf} {output.wm_fod} {input.gm_rf} {output.gm_fod} {input.csf_rf} {output.csf_fod} '
 
 rule mtnormalise:
     # Raffelt, D.; Dhollander, T.; Tournier, J.-D.; Tabbara, R.; Smith, R. E.; Pierre, E. & Connelly, A. Bias Field Correction and Intensity Normalisation for Quantitative Analysis of Apparent Fibre Density. In Proc. ISMRM, 2017, 26, 3541
