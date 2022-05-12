@@ -1,18 +1,20 @@
-import os
+#!/usr/bin/env python3
+from pathlib import Path
 
 from snakebids.app import SnakeBidsApp
 
 
 def get_parser():
     """Exposes parser for sphinx doc generation, cwd is the docs dir"""
-    app = SnakeBidsApp("../mrtpreproc", skip_parse_args=True)
+    app = SnakeBidsApp("../")
     return app.parser
 
 
 def main():
-    app = SnakeBidsApp(os.path.abspath(os.path.dirname(__file__)))
+    app = SnakeBidsApp(Path(__file__).resolve().parents[0])  # run in current folder
     app.run_snakemake()
 
 
 if __name__ == "__main__":
     main()
+
