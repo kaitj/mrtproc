@@ -120,6 +120,11 @@ parse_args:
           Default search radius is 1.5mm.'
     default: 1.5
 
+  --responsemean_dir:
+    help: Provide directory containing average response functions. If not provided,
+      one will be computed from the subjects in the input directory.
+    default: None
+
 #-----------------------------------------------------#
 
 # Containers
