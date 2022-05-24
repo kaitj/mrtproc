@@ -65,6 +65,7 @@ rule nii2mif:
             **config['subj_wildcards'],
         )
     threads: workflow.cores
+    group: "subj1"
     container:
         config['singularity']['mrtrix']
     shell:
@@ -104,20 +105,59 @@ rule dwi2response:
             **config['subj_wildcards'],
         )
     threads: workflow.cores
+    group: "subj1"
     container:
         config['singularity']['mrtrix']
     shell:
         'dwi2response dhollander {input.dwi} {output.wm_rf} {output.gm_rf} {output.csf_rf} -fslgrad {input.bvec} {input.bval} -nthreads {threads} -shells {params.shells} -lmax {params.lmax} -mask {input.mask}'
 
+rule responsemean:
+    input: 
+        wm_rf=expand(
+            rules.dwi2response.output.wm_rf, subject=config['subjects']
+        ),
+        gm_rf=expand(
+            rules.dwi2response.output.gm_rf, subject=config['subjects']
+        ),
+        csf_rf=expand(
+            rules.dwi2response.output.csf_rf, subject=config['subjects']
+        )
+    output: 
+        wm_avg_rf=bids(
+            root=join(root, 'avg'),
+            datatype='response',
+            desc='wm',
+            suffix='response.txt'
+        ),
+        gm_avg_rf=bids(
+            root=join(root, 'avg'),
+            datatype='response',
+            desc='gm',
+            suffix='response.txt'
+        ),
+        csf_avg_rf=bids(
+            root=join(root, 'avg'),
+            datatype='response',
+            desc='csf',
+            suffix='response.txt'
+        )
+    threads: workflow.cores
+    group: "group"
+    container:
+        config['singularity']['mrtrix']
+    shell:
+        'responsemean {input.wm_rf} {output.wm_avg_rf} -nthreads {threads} &&'
+        'responsemean {input.gm_rf} {output.gm_avg_rf} -nthreads {threads} &&'
+        'responsemean {input.csf_rf} {output.csf_avg_rf} -nthreads {threads}'
 
 rule dwi2fod:
     # Jeurissen, B; Tournier, J-D; Dhollander, T; Connelly, A & Sijbers, J. Multi-tissue constrained spherical deconvolution for improved analysis of multi-shell diffusion MRI data. NeuroImage, 2014, 103, 411-426
     input:
         dwi=rules.nii2mif.output.dwi,
         mask=rules.nii2mif.output.mask,
-        wm_rf=rules.dwi2response.output.wm_rf,
-        gm_rf=rules.dwi2response.output.gm_rf,
-        csf_rf=rules.dwi2response.output.csf_rf,
+        wm_rf=rules.responsemean.output.wm_avg_rf,
+        gm_rf=rules.responsemean.output.gm_avg_rf,
+        csf_rf=rules.responsemean.output.csf_avg_rf,
     params:
         shells=','.join(config['shells']),
     output:
@@ -143,6 +183,7 @@ rule dwi2fod:
             **config['subj_wildcards'],
         ),
     threads: workflow.cores
+    group: "subj2"
     container:
         config['singularity']['mrtrix']
     shell:
@@ -156,8 +197,6 @@ rule mtnormalise:
         gm_fod=rules.dwi2fod.output.gm_fod,
         csf_fod=rules.dwi2fod.output.csf_fod,
         mask=rules.nii2mif.output.mask,
-    params:
-        nthreads=workflow.cores,
     output:
         wm_fod=bids(
             root=root,
@@ -180,10 +219,12 @@ rule mtnormalise:
             suffix='csf_fod.mif',
             **config['subj_wildcards'],
         ),
+    threads: workflow.cores
+    group: "subj2"
     container:
         config['singularity']['mrtrix']
     shell:
-        'mtnormalise -nthreads {threads}  -mask {input.mask} {input.wm_fod} {output.wm_fod} {input.gm_fod} {output.gm_fod} {input.csf_fod} {output.csf_fod}'
+        'mtnormalise -nthreads {threads} -mask {input.mask} {input.wm_fod} {output.wm_fod} {input.gm_fod} {output.gm_fod} {input.csf_fod} {output.csf_fod}'
 
 rule dwi2tensor:
     input:
@@ -195,6 +236,7 @@ rule dwi2tensor:
             suffix='tensor.mif',
             **config['subj_wildcards'],
         )
+    group: "subj1"
     shell:
         'dwi2tensor {input} {output}'       
 
@@ -209,6 +251,7 @@ rule tensor2metrics:
             suffix='fa.mif',
             **config['subj_wildcards'],
         )
+    group: "subj1"
     shell:
         'tensor2metric -fa {output.fa} -mask {input.mask} {input.tensor}'       
 
@@ -227,6 +270,7 @@ rule create_seed:
             suffix='seed.mif',
             **config['subj_wildcards'],
         )
+    group: "subj2"
     shell: 'mrthreshold {input} -abs {params.threshold} {output}'
 
 
@@ -239,7 +283,6 @@ rule tckgen:
         seed=rules.create_seed.output.seed
     params:
         streamlines=config['sl_count'],
-        nthreads=workflow.cores,
         seed_strategy=lambda wildcards,input: f'-seed_image {input.seed}'
     output:
         tck=bids(
@@ -249,6 +292,8 @@ rule tckgen:
             suffix='tractography.tck',
             **config['subj_wildcards'],
         )
+    threads: workflow.cores
+    group: "subj2"
     container:
         config['singularity']['mrtrix']
     shell:
@@ -260,8 +305,6 @@ rule tcksift2:
     input:
         wm_fod=rules.mtnormalise.output.wm_fod,
         tck=rules.tckgen.output.tck,
-    params:
-        nthreads=workflow.cores,
     output:
         tckweights=bids(
             root=root,
@@ -277,6 +320,8 @@ rule tcksift2:
             suffix='mu.txt',
             **config['subj_wildcards'],
         )
+    threads: workflow.cores,
+    group: "subj2"
     container:
         config['singularity']['mrtrix']
     shell:
@@ -289,8 +334,6 @@ rule tck2connectome:
         tckweights=rules.tcksift2.output.tckweights,
         tck=rules.tckgen.output.tck,
         parcellation=config['parcellation']
-    params:
-        nthreads=workflow.cores,
     output:
         sl_assignment=bids(
                 root=root,
@@ -304,6 +347,8 @@ rule tck2connectome:
             suffix='conn.csv',
             **config['subj_wildcards'],
         )
+    threads: workflow.cores
+    group: "subj2"
     container:
         config['singularity']['mrtrix']
     shell:
