@@ -25,7 +25,7 @@ wildcard_constraints:
 
 root = os.path.join(config["root"], "mrtrix")
 
-responsemean_flag = True if config.get('responsemean_dir', None) else False
+responsemean_flag = True if config['responsemean_dir'] else False
 
 # ---- end snakebids boilerplate ------------------------------------------------
 

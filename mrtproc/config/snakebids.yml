@@ -123,6 +123,7 @@ parse_args:
   --responsemean_dir:
     help: Provide directory containing average response functions. If not provided,
       one will be computed from the subjects in the input directory.
+    default: None
 
 #-----------------------------------------------------#
 
