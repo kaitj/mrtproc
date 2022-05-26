@@ -121,9 +121,8 @@ parse_args:
     default: 1.5
 
   --responsemean_dir:
-    help: Provide directory containing average response functions. If not provided,
-      one will be computed from the subjects in the input directory.
-    default: None
+    help: 'Provide directory containing average response functions. If not provided,
+      one will be computed from the subjects in the input directory.'
 
 #-----------------------------------------------------#
 
