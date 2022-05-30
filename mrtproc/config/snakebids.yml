@@ -124,12 +124,14 @@ parse_args:
     help: 'Provide directory containing average response functions. If not provided,
       one will be computed from the subjects in the input directory.'
 
+
 #-----------------------------------------------------#
 
 # Containers
 # Note: Update from latest to use specific tags
 singularity:
-  mrtrix: "docker://brainlife/mrtrix:3.0.3"
+  mrtrix: '/project/6050199/tkai/singularity/mrtrix_3.0.3.sif' # "docker://brainlife/mrtrix:3.0.3"
+  fmriprep: '/project/6050199/akhanf/singularity/bids-apps/nipreps_fmriprep_20.2.6.sif' # ANTs transforms tested to work with this container, broken on others?
 
 
-parcellation: 'TBD'
+parcellation: '/project/ctb-akhanf/akhanf/cfmm-bids/data/Khan/LOBE/mrtproc/mrtproc/resources/Schaefer2018_300Parcels_7Networks_order_FSLMNI152_1mm.nii.gz'
