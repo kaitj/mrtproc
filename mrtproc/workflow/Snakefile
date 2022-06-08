@@ -50,7 +50,7 @@ rule all:
 # Update xfm path
 rule schaeffer2subj:
     input:
-        dwi=config["input_path"]["dwi"],
+        dwi=config["input_path"]["mask"],
         parcels=config["parcellation"],
         xfm=bids(
            root='/project/6050199/ext-data/hcp_development/deriv/fmriprep_20.2.6_LOBE_demog_matched_subset',
@@ -77,7 +77,7 @@ rule schaeffer2subj:
     container:
         config['singularity']['fmriprep']
     shell:
-        "antsApplyTransforms -d 3 -i {input.parcels} -r {input.dwi} -o {output.parcels} -n MultiLabel -t {input.xfm}"
+        "antsApplyTransforms -d 3 -i {input.parcels} -r {input.dwi} -o {output.parcels} -n NearestNeighbor -t {input.xfm}"
 
 #----------- MRTRIX PREPROC BEGIN ------------#
 rule nii2mif:
