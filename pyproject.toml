@@ -6,17 +6,17 @@ authors = ["Jason Kai <tkai@uwo.ca>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8,<3.11"
-snakebids = "^0.5.0"
+python = ">=3.8,<3.11"
+snakebids = ">=0.5.0"
 
-[tool.poetry.group.dev.dependencies]
-snakefmt = "^0.6.0"
+[tool.poetry.dev-dependencies]
+snakefmt = ">0.6.0"
 black = ">=22.1, <23.0"
-isort = "^5.10.1"
-poethepoet = "^0.13.1"
-pre-commit = "^2.18.1"
-pylint = "^2.13.7"
-flake8 = "^4.0.1"
+isort = ">=5.10.1"
+poethepoet = ">=0.13.1"
+pre-commit = ">=2.18.1"
+pylint = ">=2.13.7"
+flake8 = ">=4.0.1"
 
 [build-system]
 requires = ["poetry-core"]
