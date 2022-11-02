@@ -222,7 +222,7 @@ rule mtnormalise:
             **config['subj_wildcards'],
         ),
     threads: workflow.cores
-    group: "subj1"
+    group: "subj2"
     container:
         config['singularity']['mrtrix']
     shell:
